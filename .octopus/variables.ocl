@@ -1,0 +1,11 @@
+variable "Octopus.Acquire.DeltaCompressionEnabled" {
+    value "False" {
+        channel = ["multi-innsikt-channel"]
+    }
+}
+
+variable "Octopus.Deployment.ForcePackageDownload" {
+    value "True" {
+        channel = ["multi-innsikt-channel"]
+    }
+}

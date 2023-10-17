@@ -1,0 +1,81 @@
+step "deploy-a-package" {
+    name = "Deploy a Package"
+    properties = {
+        Octopus.Action.TargetRoles = "BSB_DEVMAIN"
+    }
+
+    action {
+        action_type = "Octopus.TentaclePackage"
+        properties = {
+            Octopus.Action.EnabledFeatures = "Octopus.Features.CustomDirectory,Octopus.Features.CustomScripts"
+            Octopus.Action.Package.CustomInstallationDirectory = " /u01/app/Octopus/Deployment"
+            Octopus.Action.Package.DownloadOnTentacle = "False"
+            Octopus.Action.Package.FeedId = "octopus-server-built-in"
+            Octopus.Action.Package.PackageId = "BGI.hotfix"
+        }
+        worker_pool_variable = ""
+
+        packages {
+            acquisition_location = "Server"
+            feed = "octopus-server-built-in"
+            package_id = "BGI.hotfix"
+            properties = {
+                SelectionMode = "immediate"
+            }
+        }
+    }
+}
+
+step "run-a-script" {
+    name = "Run a Script"
+    properties = {
+        Octopus.Action.TargetRoles = "BSB_DEVMAIN"
+    }
+
+    action {
+        action_type = "Octopus.Script"
+        channels = ["multi-innsikt-channel"]
+        properties = {
+            Octopus.Action.RunOnServer = "false"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                PackageName="Multi.Innsikt.Release.$(get_octopusvariable "Octopus.Action[Deploy a Package].Package.PackageVersion")"
+                echo "$PackageName"
+                
+                cd /u01/app/Octopus/Deployment/"$PackageName"/scripts
+                echo "***DEGUG***"
+                source $HOME/.bash_profile
+                source $HOME/SQL.env
+                echo "***DEGUG***"
+                
+                
+                #{if Octopus.Environment.Name == "Multi.Innsikt.SIT"}
+                  echo "SIT"
+                  HOSTNAME=$(hostname -s) python Install.py $(get_octopusvariable "Multi.Innsikt.Config.File.Password")
+                #{/if}
+                
+                #{if Octopus.Environment.Name == "Multi.Innsikt.DEV2"}
+                  echo "DEV2"
+                  HOSTNAME=$(hostname -s) python Install.py $(get_octopusvariable "Multi.Innsikt.Config.File.Password")
+                #{/if}
+                
+                #{if Octopus.Environment.Name == "Multi.Innsikt.QA"}
+                  echo "QA"
+                  HOSTNAME=$(hostname -s) python Install.py $(get_octopusvariable "Multi.Innsikt.Config.File.Password")
+                #{/if}
+                
+                #{if Octopus.Environment.Name == "Multi.Innsikt.PROD"}
+                  echo "PROD"
+                  HOSTNAME=$(hostname -s) python Install.py $(get_octopusvariable "Multi.Innsikt.Config.File.Password")
+                #{/if}
+                
+                
+                cd /u01/app/Octopus/Deployment
+                mv $PackageName "$PackageName $(date +%Y%m%d_%H%M%S) $(get_octopusvariable "Octopus.Environment.Name")"
+                
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "Bash"
+        }
+        worker_pool_variable = ""
+    }
+}
